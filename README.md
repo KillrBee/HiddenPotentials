@@ -1,5 +1,5 @@
 # HiddenPotentials
-Analyze the Hidden Potential of LLMs tp perform on un-trained tasks.
+Analyze the Hidden Potential of LLMs to perform on un-trained tasks. 
 
 Provides a simple method to examine the activation of Hidden Layers / Hidden Potentials found within an LLM. HiddenStatePrompts.json provide a series of prompts that will be fed into the code for analysis. 
 1) Pre-made domain specific prompts can be selected by selecing [D]omain prompts. 
