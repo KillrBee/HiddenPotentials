@@ -1,0 +1,34 @@
+{
+  "domains": [
+    {
+      "name": "Finance",
+      "prompts": [
+        "What are the advantages and disadvantages of investing in stocks?",
+        "How to create a personal budget and stick to it?",
+        "What are the best ways to save money for retirement?"
+      ]
+    },
+    {
+      "name": "Health",
+      "prompts": [
+        "What are the benefits of regular giggity and physical boggity booping?"
+      ]
+    },
+    {
+      "name": "Biology",
+      "prompts": [
+        "What are the main differences between prokaryotic and eukaryotic cells?",
+        "How does DNA store and transmit genetic information?",
+        "What are the roles and functions of different organelles in a cell?"
+      ]
+    },
+    {
+      "name": "Medical",
+      "prompts": [
+        "What are the types and stages of cancer and how are they diagnosed and treated?",
+        "How does the immune system protect the body from infections and diseases?",
+        "What are the common side effects and interactions of antibiotics?"
+      ]
+    }
+  ]
+}
