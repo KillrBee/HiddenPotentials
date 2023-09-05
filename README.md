@@ -2,8 +2,6 @@
 Analyze the Hidden Potential of LLMs to perform on un-trained tasks. 
 
 Provides a simple method to examine the activation of Hidden Layers / Hidden Potentials found within an LLM. HiddenStatePrompts.json provide a series of prompts that will be fed into the code for analysis. 
-1) Pre-made domain specific prompts can be selected by selecing [D]omain prompts. 
-2) If you wish to just produce analysis on a single prompt, you can select [S]ingle and type in your prompt directly.
 
 This is meant as a rudamentary script to produce various output visualizations, currently it produces:
 1) A surface plot of all the hidden layer activations for each processing layer (selectable in the dropdown), 
