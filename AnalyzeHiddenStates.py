@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.mplot3d import Axes3D 
 from matplotlib.colors import LinearSegmentedColormap
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, PreTrainedTokenizerFast
 import numpy as np
 import plotly.express as px
 import pandas as pd
@@ -18,44 +18,49 @@ AllOutputs = []  # the list of outputs
 attentions = []
 all_tokens = []
 selected_prompts = []
-model_name = "PATH\TO\YOUR\MODEL\HERE"
-
+logits = []
+#E:\Downloads\_old\text-generation-webui\models\TheBloke_airoboros-33B-gpt4-1-4-SuperHOT-8K-GPTQ
+model_name = "/mnt/e/Downloads/text-generation-webui/text-generation-webui/models/ehartford_WizardLM-33B-V1.0-Uncensored"
+#model_name = "/mnt/e/Downloads/_Nous-Hms-L2-13b/"
+#model_name = "E:\Downloads\_Nous-Hms-L2-13b"
 
 def load_all_prompts():
     # Ask the user whether they want to enter a prompt or load prompts from a domain
-    choice = input(
-        'Do you want to enter a single prompt or load prompts from a domain? Enter "(S)ingle" or "(D)omain": '
-    )
-    if choice.lower() == "s":
-        # The user wants to enter a single prompt
-        man_prompt = input("Please enter your prompt: ")
-        prompts = [man_prompt]
-    elif choice.lower() == "d":
-        # Load all prompts
-        with open("HiddenStatePrompts.json", "r") as file:
-            all_prompts = json.load(file)
+    man_prompt = input("Please enter your prompt: ")
+    prompts = [man_prompt]
+    # choice = input(
+        # 'Do you want to enter a single prompt or load prompts from a domain? Enter "(S)ingle" or "(D)omain": '
+    # )
+    # if choice.lower() == "s":
+        # # The user wants to enter a single prompt
+        # man_prompt = input("Please enter your prompt: ")
+        # prompts = [man_prompt]
+    # elif choice.lower() == "d":
+        # # Load all prompts
+        # with open("HiddenStatePrompts.json", "r") as file:
+            # all_prompts = json.load(file)
 
-        # Get the list of domain dictionaries
-        domains = all_prompts["domains"]
+        # # Get the list of domain dictionaries
+        # domains = all_prompts["domains"]
 
-        # Print out the domain names
-        for i, domain in enumerate(domains):
-            print(f"{i + 1}. {domain['name']}")
-        # The user wants to load prompts from a domain
-        domain_index = (
-            int(input("Please enter the number of the domain you want to select: ")) - 1
-        )
+        # # Print out the domain names
+        # for i, domain in enumerate(domains):
+            # print(f"{i + 1}. {domain['name']}")
+        # # The user wants to load prompts from a domain
+        # domain_index = (
+            # int(input("Please enter the number of the domain you want to select: ")) - 1
+        # )
 
-        # Check if the provided index is valid
-        if domain_index < 0 or domain_index >= len(domains):
-            raise ValueError(
-                f"Invalid index {domain_index + 1}. Please enter a number between 1 and {len(domains)}."
-            )
+        # # Check if the provided index is valid
+        # if domain_index < 0 or domain_index >= len(domains):
+            # raise ValueError(
+                # f"Invalid index {domain_index + 1}. Please enter a number between 1 and {len(domains)}."
+            # )
 
-        # Get the prompts for the selected domain
-        prompts = domains[domain_index]["prompts"]
-    else:
-        raise ValueError('Invalid choice. Please enter "S" or "D".')
+        # # Get the prompts for the selected domain
+        # prompts = domains[domain_index]["prompts"]
+    # else:
+        # raise ValueError('Invalid choice. Please enter "S" or "D".')
     selected_prompts.append(prompts)
     return selected_prompts
 
@@ -66,22 +71,26 @@ def load_model_and_encode(prompts):
 
     #  Load model and tokenizer
     print(f"Loading Tokenizer:")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = PreTrainedTokenizerFast.from_pretrained(model_name)  
+    #tokenizer = AutoTokenizer.from_pretrained(model_name)
     print(f"Setting Configuration Profile")
     config = AutoConfig.from_pretrained(
         model_name,
         init_device="meta",
         trust_remote_code=True,
         output_hidden_states=True,
-        output_attentions=True
+        output_attentions=True,
+        #torch_dtype="bfloat16",
+        do_sample=True,
+        max_new_tokens=128
     )
 
     # Load the model
     print(f"Loading the Model")
     model = AutoModelForCausalLM.from_pretrained(
-        model_name, config=config, trust_remote_code=True
-    )
-
+        model_name, config=config, trust_remote_code=True, load_in_4bit=True) #, torch_dtype=torch.float16)
+   
+    print(f"Finished Loading the Model")
     # Encode prompts and get hidden states
     print(f"Encoding Prompts and getting Internal Model Data")
     for prompt in selected_prompts:
@@ -91,16 +100,16 @@ def load_model_and_encode(prompts):
         prompt_tokens = []
         for i, token in enumerate(tokens):
             prompt_tokens.append(token)
-        all_tokens.append(prompt_tokens)
+            all_tokens.append(prompt_tokens)
         outputs = model(
             input_ids=inputs["input_ids"],
             attention_mask=inputs.get("attention_mask"),
-            return_dict=True,
-        )
+            return_dict=True) 
+            #do_sample=True, 
+            #max_new_tokens=512)
         AllOutputs.append(outputs.logits)
         hidden_states.append(outputs.hidden_states)
         attentions.append(outputs.attentions)
-        logits = outputs.logits
 
     return hidden_states, attentions, all_tokens
 
@@ -132,13 +141,48 @@ def plot_attention_heatmaps(attentions, all_tokens):
 
 def plot_depth_graph(hidden_states, all_tokens):
     figgraph = go.Figure()
-
     total_layers = len(hidden_states[0])  # Assuming all hidden states have the same number of layers
-
+    print(f"Starting Surface Plot Generation")
     for i in range(total_layers):
             for j, hidden_state in enumerate(hidden_states):
-                data = hidden_state[i][0].detach().numpy()
+                data = hidden_state[i][0].float().detach().numpy()
 
+                # # Debug Code
+                # print(f"Debugging data types")
+                # print(f"------------------------------")
+                # print(type(hidden_states))
+                # print(type(hidden_states[0]))
+                # print(type(hidden_states[0][0]))
+                # print(hidden_states[0][0].dtype)
+                # print(f"------------------------------")
+                # print(f"Unique data types")
+                # print(f"------------------------------")
+                # unique_data_types = set()
+                # for state in hidden_states:
+                    # for layer in state:
+                        # unique_data_types.update(np.unique(layer.detach().numpy().dtype))
+                # print(unique_data_types)
+                # print(f"------------------------------")
+                # print(f"Checking for NaN")
+                # print(f"------------------------------")
+                # contains_nan_or_inf = any(np.isnan(hidden_state).any() or np.isinf(hidden_state).any() for hidden_state in hidden_states)
+                # print(f"Contains NaN or infinite values: {contains_nan_or_inf}")
+                # print(f"------------------------------")
+                # print(f"Checking for problem elements")
+                # print(f"------------------------------")
+                # for i, state in enumerate(hidden_states):
+                    # for j, layer in enumerate(state):
+                        # data = layer.detach().numpy()
+                        # if data.dtype not in [np.float32, np.float64]:
+                            # print(f"Unexpected datatype at hidden_state[{i}][{j}]: {data.dtype}")
+                        # if np.isnan(data).any():
+                            # print(f"NaN value detected at hidden_state[{i}][{j}]")
+                        # if np.isinf(data).any():
+                            # print(f"Infinite value detected at hidden_state[{i}][{j}]")
+                
+                # print(f"------------END DEBUG----------------------")
+
+                
                 x_values = [f'Hidden_State {k}' for k in range(data.shape[1])]
                 y_values = [f'{all_tokens[j][l]}' for l in range(data.shape[0])]
 
@@ -259,7 +303,7 @@ def plot_acvtivation_heatmap(hidden_states, all_tokens):
 
     # Initialize an array to store average values for each token in each layer
     avg_values = np.zeros((num_tokens, total_layers))
-
+    print(f"Starting Heatmap Generation")
     # Calculate average values
     for i in range(total_layers):
         for j, hidden_state in enumerate(hidden_states):
@@ -275,8 +319,8 @@ def plot_acvtivation_heatmap(hidden_states, all_tokens):
         token_labels.pop(index)
 
     # Calculate mean and standard deviation
-    mean_val = np.mean(avg_values)
-    std_val = np.std(avg_values)
+    mean_val = np.mean(avg_values)/2
+    std_val = np.std(avg_values)/2
     
     # Normalize the colorscale breakpoints
     min_val = np.min(avg_values)
@@ -321,7 +365,7 @@ def plot_histogram(hidden_states, all_tokens):
     fig = plt.figure(figsize=(20, 20))
     ax = fig.add_subplot(111, projection='3d')  # Create a 3D axis
 
-
+    print(f"Plotting Bargraph plot")
     # Initial plot with average values
     avg_values = np.mean(np.array([[hidden_state[i][0].detach().numpy()[:, 0] for i in range(total_layers)] for hidden_state in hidden_states]), axis=0)
     num_tokens, total_layers = avg_values.shape
@@ -385,7 +429,7 @@ def plot_histogram(hidden_states, all_tokens):
     ax.set_zlabel('Avg. Hidden State Activation')
     
     # ax.set_xticks(np.arange(total_layers))
-     ax.set_xticklabels([f'Layer {i+1}' for i in range(total_layers)], rotation=90, ha='right')
+    ax.set_xticklabels([f'Layer {i+1}' for i in range(total_layers)], rotation=90, ha='right')
 
     #ax.set_xticks(np.arange(num_tokens))
     ax.set_xticklabels(all_tokens[0])
@@ -398,7 +442,7 @@ hidden_states, attentions, all_tokens = load_model_and_encode(selected_prompts)
 
 print(f"Analyzed Tokens: {all_tokens}")
 
-print(f"Starting Heatmap Generation")
+print(f"Starting Plot Generation")
 
 # Create empty go.Figure() object
 fig = go.Figure()
@@ -409,7 +453,7 @@ plot_depth_graph(hidden_states, all_tokens)
 
 # Generate plots that show the complete end to end activations
 plot_acvtivation_heatmap(hidden_states, all_tokens)
-plot_histogram(hidden_states, all_tokens)
+#plot_histogram(hidden_states, all_tokens)
 
 # TODO: 
 #plot_attention_heatmaps(attentions, all_tokens)
